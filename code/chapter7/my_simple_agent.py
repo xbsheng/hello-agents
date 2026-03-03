@@ -73,7 +73,8 @@ class MySimpleAgent(SimpleAgent):
         tools_section += "\n## 工具调用格式\n"
         tools_section += "当需要使用工具时，请使用以下格式：\n"
         tools_section += "`[TOOL_CALL:{tool_name}:{parameters}]`\n"
-        tools_section += "例如：`[TOOL_CALL:search:Python编程]` 或 `[TOOL_CALL:memory:recall=用户信息]`\n\n"
+        tools_section += "例如：`[TOOL_CALL:search:Python编程]` 或 `[TOOL_CALL:memory:recall=用户信息]`\n"
+        tools_section += "无参工具可用 `[TOOL_CALL:工具名]` 或 `[TOOL_CALL:工具名:]`，如 `[TOOL_CALL:list_supported_cities]`。\n\n"
         tools_section += "工具调用结果会自动插入到对话中，然后你可以基于结果继续回答。\n"
 
         return base_prompt + tools_section
@@ -128,18 +129,17 @@ class MySimpleAgent(SimpleAgent):
         return final_response
 
     def _parse_tool_calls(self, text: str) -> list:
-        """解析文本中的工具调用"""
-        pattern = r'\[TOOL_CALL:([^:]+):([^\]]+)\]'
-        matches = re.findall(pattern, text)
-
+        """解析文本中的工具调用。支持 [TOOL_CALL:name:params] 与无参 [TOOL_CALL:name] / [TOOL_CALL:name:]"""
+        pattern = r'\[TOOL_CALL:([^:\]]+)(?::([^\]]*))?\]'
         tool_calls = []
-        for tool_name, parameters in matches:
+        for m in re.finditer(pattern, text):
+            tool_name = m.group(1).strip()
+            parameters = (m.group(2) or '').strip()
             tool_calls.append({
-                'tool_name': tool_name.strip(),
-                'parameters': parameters.strip(),
-                'original': f'[TOOL_CALL:{tool_name}:{parameters}]'
+                'tool_name': tool_name,
+                'parameters': parameters,
+                'original': m.group(0),
             })
-
         return tool_calls
 
     def _execute_tool_call(self, tool_name: str, parameters: str) -> str:
